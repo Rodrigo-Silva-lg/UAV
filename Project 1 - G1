@@ -1,0 +1,394 @@
+%% CRAZYFLIE NONLINEAR MODEL
+
+%Parameters
+
+g_earth = 9.81;
+Cd = 0.2056;
+ro_earth=1.225;
+m = 0.035;
+Ct= 0.035;
+Cq=0.005;
+
+J = [1.4730*10^-5 0 0
+     0 1.4797*10^-5 0
+     0 0 2.8476*10^-5];
+
+T1 = 1.1*m*g_earth;
+T2 = 1.1*m*g_earth;
+T3 = 1.1*m*g_earth;
+T4 = 1.1*m*g_earth;
+
+%f's & n's assuming T=1
+
+f1 = [0;0;T1];
+p1 = [0.0325269;-0.0325269;0];
+n1= Cq/Ct*[0;0;1];
+pf1 = cross(p1,f1);
+f2 = [0;0;T2];
+p2 = [-0.0325269;0.0325269;0];
+n2= Cq/Ct*[0;0;1];
+pf2 = cross(p2,f2);
+f3 = [0;0;T3];
+p3 = [0.0325269;0.0325269;0];
+n3= Cq/Ct*[0;0;-1];
+pf3 = cross(p3,f3);
+f4 = [0;0;T4];
+p4 = [-0.0325269;-0.0325269;0];
+n4= Cq/Ct*[0;0;-1];
+pf4 = cross(p4,f4);
+
+%Simulation
+
+zI=[0;0;1];
+Dt=0.01;
+t=0:Dt:60;
+Nsim=length(t);
+x0=zeros(12,1);
+x=zeros(12,Nsim);
+y=zeros(4,Nsim);
+x(:,1) = x0;
+
+d = [	0.2056	,	0		,	 0
+			0	,	0.2056	,	0
+			0	,	0	    ,	 0.2056	];
+
+for k = 1:Nsim
+
+  p=x(1:3,k);
+  v=x(4:6,k);
+  lambda=x(7:9,k);
+  omega=x(10:12,k);
+  R=Euler2R(lambda);
+  Q=Euler2Q(lambda);
+  fp=T1*f1+T2*f2+T3*f3+T4*f4;
+  np=(n1+pf1)+(n2+pf2)+(n3+pf3)+(n4+pf4);
+
+  p_dot=R*v;
+  lambda_dot=Q*omega;
+  v_dot=-skew(omega)*v-(g_earth*R'*zI)-(d*v)+(fp/m);
+  omega_dot=-J^-1*skew(omega)*J*omega+(J^-1*np);
+  x_dot=[p_dot;v_dot;lambda_dot;omega_dot];
+
+
+  x(:,k+1)=x(:,k)+Dt*x_dot;
+  y(1:9,k)=x(1:9,k); 
+
+end
+
+figure;
+subplot(3,1,1)
+plot(t,y(1,:));
+legend('px')
+axis([0 60 -1 1])
+grid on
+subplot(3,1,2)
+plot(t,y(2,:));
+legend('py');
+axis([0 60 -1 1])
+grid on
+subplot(3,1,3)
+plot(t,y(3,:));
+legend('pz');
+grid on
+
+figure;
+subplot(3,1,1)
+plot(t,y(4,:));
+legend('vx')
+axis([0 60 -1 1])
+grid on
+subplot(3,1,2)
+plot(t,y(5,:));
+legend('vy');
+axis([0 60 -1 1])
+grid on
+subplot(3,1,3)
+plot(t,y(6,:));
+legend('vz');
+grid on
+
+figure;
+plot3(y(1,:), y(2,:), y(3,:), 'b', 'LineWidth', 1.5);
+hold on;
+plot3(y(1,1), y(2,1), y(3,1), 'go', 'MarkerSize', 10, 'MarkerFaceColor', 'g'); % Start point
+plot3(y(1,end), y(2,end), y(3,end), 'ro', 'MarkerSize', 10, 'MarkerFaceColor', 'r'); % End point
+xlabel('X Position');
+ylabel('Y Position');
+zlabel('Z Position');
+grid on;
+legend('Trajectory', 'Start', 'End');
+title('3D Trajectory of the Drone');
+hold off;
+
+
+figure;
+subplot(3,1,1)
+plot(t,y(7,:));
+legend('lambda x')
+axis([0 60 -1 1])
+grid on
+subplot(3,1,2)
+plot(t,y(8,:));
+legend('lambda y');
+axis([0 60 -1 1])
+grid on
+subplot(3,1,3)
+plot(t,y(9,:));
+legend('lambda z');
+grid on
+
+%% MODEL 1
+
+%Parameters
+Dt = 0.01;
+t = 0:Dt:60;
+Nsim = length(t);
+T = (m*g_earth);
+u = ones(Nsim,1)*[T,T,T,T];
+
+%Equilibrium Conditions
+px = 0;
+py = 0;
+pz = 0;
+p = [px;py;pz];
+wx = 0;  
+wy = 0;
+wz = 0;
+omega = [wx;wy;wz]; 
+vx = 0;
+vy = 0;
+vz = 0;
+v = [vx;vy;vz];
+phi = deg2rad(0);
+theta = deg2rad(0);
+psi = deg2rad(0);
+lbd = [phi;theta;psi];
+x0 = [p; v; lbd; omega];
+u = ones(Nsim,1)*[T,T,T,T];
+Ixx=1.4730*10^-5;
+Iyy=1.4797*10^-5;
+Izz=2.8476*10^-5;
+
+d = [	0.2056	,	0		,	 0
+			0	,	0.2056	,	0
+			0	,	0	    ,	 0.2056	];
+
+a1 =[0,-cos(theta),0
+    cos(phi)*cos(theta),-sin(phi)*sin(theta), 0
+    -sin(phi)*cos(theta),-cos(phi)*sin(theta),0];
+
+A1 =[zeros(3),Euler2R(lbd),zeros(3),zeros(3)
+    zeros(3),-d,-g_earth*a1,zeros(3) 
+    zeros(3),zeros(3),zeros(3),Euler2Q(lbd)
+    zeros(3),zeros(3),zeros(3),zeros(3)];
+
+B1 =[  0,    0,    0,    0
+      0,    0,    0,    0
+      0,    0,    0,    0
+      0,    0,    0,    0
+      0,    0,    0,    0
+    1/m,    0,    0,    0
+      0,    0,    0,    0
+      0,    0,    0,    0
+      0,    0,    0,    0
+      0, 1/Ixx,    0,    0
+      0,    0, 1/Iyy,    0
+      0,    0,    0, 1/Izz];
+
+C1=  eye(12);
+
+D1 = zeros(12,4);
+
+sys1 = ss(A1,B1,C1,D1);
+y_L1 = lsim(sys1,u,t,x0);
+
+%Eigenvalues
+[V,D,W] = eig(A1);
+
+figure;
+plot(real(diag(D)), imag(diag(D)), 'bx', 'MarkerSize', 10, 'LineWidth', 2);
+xlabel('Real part');
+ylabel('Imaginary part');
+title('Eigen values in the complex plane - Mode 1');
+grid on;
+axis equal;
+
+% Controllability, observability and stability
+[M1,J1] = jordan(A1);
+if rank(ctrb(A1,B1)) < size(A1,1), disp('The system is not controllable');
+else 
+    disp('The system is controllable');
+end
+if rank(obsv(A1,C1)) < size(A1,1), disp('The system is not observable');
+else 
+    disp('The system is observable');
+end
+ctrb_modes = W'*B1;
+obsv_modes = C1*V;
+
+
+%% Model 2
+
+%Parameters
+Dt = 0.01;
+t = 0:Dt:60;
+Nsim = length(t);
+T = 0.09739;
+u = ones(Nsim,1)*[T,T,T,T];
+
+%Equilibrium Conditions
+px = 0;
+py = 0;
+pz = 0;
+p = [px;py;pz];
+wx = 0;  
+wy = 0;
+wz = 0;
+omega = [wx;wy;wz]; 
+vx = 10;
+vy = 0;
+vz = 0;
+v = [vx;vy;vz];
+phi = deg2rad(0);
+theta = deg2rad(12.09786);
+psi = deg2rad(0);
+lbd = [phi;theta;psi];
+x0 = [p; v; lbd; omega];
+u = ones(Nsim,1)*[T,T,T,T];
+Ixx=1.4730*10^-5;
+Iyy=1.4797*10^-5;
+Izz=2.8476*10^-5;
+d = [	0.2056	,	0		,	 0
+			0	,	0.2056	,	0
+			0	,	0	    ,	 0.2056	];
+
+a2 =[0,-cos(theta),0
+    cos(phi)*cos(theta),-sin(phi)*sin(theta), 0
+    -sin(phi)*cos(theta),-cos(phi)*sin(theta),0];
+
+b2 =[0, -vx*sin(theta),0    %matrix already simplied for this mode
+     0,  0,vx*cos(theta)
+     0, -vx*cos(theta),0];
+
+
+A2 =[zeros(3),Euler2R(lbd),b2,zeros(3)
+    zeros(3),-d,-g_earth*a2,zeros(3) 
+    zeros(3),zeros(3),zeros(3),Euler2Q(lbd)
+    zeros(3),zeros(3),zeros(3),zeros(3)];
+
+B2 =[ 0,    0,    0,    0
+      0,    0,    0,    0
+      0,    0,    0,    0
+      0,    0,    0,    0
+      0,    0,    0,    0
+    1/m,    0,    0,    0
+      0,    0,    0,    0
+      0,    0,    0,    0
+      0,    0,    0,    0
+      0, 1/Ixx,    0,   0
+      0,    0, 1/Iyy,   0
+      0,    0,    0, 1/Izz];
+
+C2 =eye(12);
+
+D2 = zeros(12,4);
+
+sys2 = ss(A2,B2,C2,D2);
+y_L2 = lsim(sys2,u,t,x0);
+
+%Eigenvalues
+[V,D,W] = eig(A2);
+
+figure;
+plot(real(diag(D)), imag(diag(D)), 'bx', 'MarkerSize', 10, 'LineWidth', 2);
+xlabel('Real part');
+ylabel('Imaginary part');
+title('Eigen values in the complex plane - Mode 2');
+grid on;
+axis equal;
+
+
+% Controllability, observability and stability
+[M2,J2] = jordan(A2);
+if rank(ctrb(A2,B2)) < size(A2,1), disp('The system is not controllable');
+else 
+    disp('The system is controllable');
+end
+if rank(obsv(A2,C2)) < size(A2,1), disp('The system is not observable');
+else 
+    disp('The system is observable');
+end
+ctrb_modes = W'*B2;
+obsv_modes = C2*V;
+
+
+%% Transfer functions - (1.11)
+
+% Hover
+s = tf('s');
+G1 = 29 / (s^2 + 0.2056*s);
+figure; 
+rlocus(G1)
+title('Root Locus of G1(s)');
+
+s = tf('s');
+G2 = -9.81 / (s^2 + 0.2056*s);
+figure;
+rlocus(G2)
+title('Root Locus of G2(s)');
+
+% Horizontal flight
+s = tf('s');
+G3 = 29 / (s^2 + 0.2056*s);
+figure;
+rlocus(G3)
+title('Root Locus of G3(s)');
+
+s = tf('s');
+G4 = -9.5921 / (s^2 + 0.2056*s);
+figure;
+rlocus(G4)
+title('Root Locus of G4(s)');
+
+
+%% Auxiliary Functions
+
+function rot = Euler2R(ang)
+
+
+rotx = [	1	,	0			,	 0
+			0	,	cos(ang(1))	,	-sin(ang(1))
+			0	,	sin(ang(1))	,	 cos(ang(1))	];
+roty = [	 cos(ang(2))	,	0	,	sin(ang(2))
+			0				,	1	,	0
+			-sin(ang(2))	,	0	,	cos(ang(2))	];
+rotz = [	cos(ang(3))	,	-sin(ang(3))	,	0
+			sin(ang(3))	,	 cos(ang(3))	,	0
+			0			,	 0				,	1	];
+rot = rotz*roty*rotx;
+
+end
+
+function Q = Euler2Q(l)
+
+phi = l(1); theta = l(2);
+Q = [  1 sin(phi)*tan(theta) cos(phi)*tan(theta);
+       0 cos(phi)           -sin(phi);
+       0 sin(phi)/cos(theta) cos(phi)/cos(theta)];
+end
+
+function X=skew(x)
+
+
+n = length(x);
+if n == 3
+    X = [   0      -x(3)    x(2)
+            x(3)    0      -x(1)
+           -x(2)    x(1)    0     ];
+elseif n == 1
+    X = [   0      -x(1)
+            x(1)    0    ];
+else
+    error('SKEW function not implemented for input dimensions other than 1 or 3 (i.e., so(2) and so(3)).');
+end
+end
